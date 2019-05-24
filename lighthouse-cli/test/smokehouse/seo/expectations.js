@@ -23,25 +23,30 @@ const failureHeaders = headersParam([[
   '<https://example.com>; rel="canonical"',
 ]]);
 
+const passHeaders = headersParam([[
+  'link',
+  '<http://localhost:10200/seo/>; rel="canonical"',
+]]);
+
 /**
  * Expected Lighthouse audit values for seo tests
  */
 module.exports = [
   {
-    initialUrl: BASE_URL + 'seo-tester.html',
-    url: BASE_URL + 'seo-tester.html',
+    requestedUrl: BASE_URL + 'seo-tester.html?' + passHeaders,
+    finalUrl: BASE_URL + 'seo-tester.html?' + passHeaders,
     audits: {
       'viewport': {
-        score: true,
+        score: 1,
       },
       'document-title': {
-        score: true,
+        score: 1,
       },
       'meta-description': {
-        score: true,
+        score: 1,
       },
       'http-status-code': {
-        score: true,
+        score: 1,
       },
       'font-size': {
         rawValue: true,
@@ -52,50 +57,49 @@ module.exports = [
         },
       },
       'link-text': {
-        score: true,
+        score: 1,
       },
       'is-crawlable': {
-        score: true,
+        score: 1,
       },
       'hreflang': {
-        score: true,
+        score: 1,
       },
       'plugins': {
-        score: true,
+        score: 1,
       },
       'canonical': {
-        score: true,
+        score: 1,
+      },
+      'robots-txt': {
+        rawValue: true,
+        scoreDisplayMode: 'not-applicable',
       },
     },
   },
   {
-    initialUrl: BASE_URL + 'seo-failure-cases.html?status_code=403&' + failureHeaders,
-    url: BASE_URL + 'seo-failure-cases.html?status_code=403&' + failureHeaders,
+    requestedUrl: BASE_URL + 'seo-failure-cases.html?status_code=403&' + failureHeaders,
+    finalUrl: BASE_URL + 'seo-failure-cases.html?status_code=403&' + failureHeaders,
     audits: {
       'viewport': {
-        score: false,
+        score: 0,
       },
       'document-title': {
-        score: false,
-        extendedInfo: {
-          value: {
-            id: 'document-title',
-          },
-        },
+        score: 0,
       },
       'meta-description': {
-        score: false,
+        score: 0,
       },
       'http-status-code': {
-        score: false,
+        score: 0,
         displayValue: '403',
       },
       'font-size': {
         rawValue: false,
-        debugString: 'Text is illegible because of a missing viewport config',
+        explanation: 'Text is illegible because of a missing viewport config',
       },
       'link-text': {
-        score: false,
+        score: 0,
         displayValue: '3 links found',
         details: {
           items: {
@@ -104,7 +108,7 @@ module.exports = [
         },
       },
       'is-crawlable': {
-        score: false,
+        score: 0,
         details: {
           items: {
             length: 2,
@@ -112,7 +116,7 @@ module.exports = [
         },
       },
       'hreflang': {
-        score: false,
+        score: 0,
         details: {
           items: {
             length: 3,
@@ -120,7 +124,7 @@ module.exports = [
         },
       },
       'plugins': {
-        score: false,
+        score: 0,
         details: {
           items: {
             length: 3,
@@ -128,8 +132,8 @@ module.exports = [
         },
       },
       'canonical': {
-        score: false,
-        debugString: 'Multiple URLs (https://example.com, https://example.com/)',
+        score: 0,
+        explanation: 'Multiple conflicting URLs (https://example.com, https://example.com/)',
       },
     },
   },

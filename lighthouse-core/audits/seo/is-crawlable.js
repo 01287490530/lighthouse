@@ -6,6 +6,8 @@
 'use strict';
 
 const Audit = require('../audit');
+const robotsParser = require('robots-parser');
+const URL = require('../../lib/url-shim');
 const BLOCKLIST = new Set([
   'noindex',
   'none',
@@ -56,26 +58,30 @@ function hasUserAgent(directives) {
 
 class IsCrawlable extends Audit {
   /**
-   * @return {!AuditMeta}
+   * @return {LH.Audit.Meta}
    */
   static get meta() {
     return {
-      name: 'is-crawlable',
-      description: 'Page isn’t blocked from indexing',
-      failureDescription: 'Page is blocked from indexing',
-      helpText: 'The "Robots" directives tell crawlers how your content should be indexed. ' +
-      '[Learn more](https://developers.google.com/search/reference/robots_meta_tag).',
-      requiredArtifacts: ['MetaRobots'],
+      id: 'is-crawlable',
+      title: 'Page isn’t blocked from indexing',
+      failureTitle: 'Page is blocked from indexing',
+      description: 'Search engines are unable to include your pages in search results ' +
+          'if they don\'t have permission to crawl them. [Learn ' +
+          'more](https://developers.google.com/web/tools/lighthouse/audits/indexing).',
+      requiredArtifacts: ['MetaRobots', 'RobotsTxt', 'URL'],
     };
   }
 
   /**
-   * @param {!Artifacts} artifacts
-   * @return {!AuditResult}
+   * @param {LH.Artifacts} artifacts
+   * @return {Promise<LH.Audit.Product>}
    */
   static audit(artifacts) {
-    return artifacts.requestMainResource(artifacts.devtoolsLogs[Audit.DEFAULT_PASS])
+    const devtoolsLog = artifacts.devtoolsLogs[Audit.DEFAULT_PASS];
+
+    return artifacts.requestMainResource({devtoolsLog, URL: artifacts.URL})
       .then(mainResource => {
+        /** @type {Array<Object<string, LH.Audit.DetailsItem>>} */
         const blockingDirectives = [];
 
         if (artifacts.MetaRobots) {
@@ -84,20 +90,34 @@ class IsCrawlable extends Audit {
           if (isBlocking) {
             blockingDirectives.push({
               source: {
-                type: 'node',
+                type: /** @type {'node'} */ ('node'),
                 snippet: `<meta name="robots" content="${artifacts.MetaRobots}" />`,
               },
             });
           }
         }
 
-        mainResource.responseHeaders
+        mainResource.responseHeaders && mainResource.responseHeaders
           .filter(h => h.name.toLowerCase() === ROBOTS_HEADER && !hasUserAgent(h.value) &&
             hasBlockingDirective(h.value))
           .forEach(h => blockingDirectives.push({source: `${h.name}: ${h.value}`}));
 
+        if (artifacts.RobotsTxt.content) {
+          const robotsFileUrl = new URL('/robots.txt', mainResource.url);
+          const robotsTxt = robotsParser(robotsFileUrl.href, artifacts.RobotsTxt.content);
+
+          if (!robotsTxt.isAllowed(mainResource.url)) {
+            blockingDirectives.push({
+              source: {
+                type: /** @type {'url'} */ ('url'),
+                value: robotsFileUrl.href,
+              },
+            });
+          }
+        }
+
         const headings = [
-          {key: 'source', itemType: 'code', text: 'Source'},
+          {key: 'source', itemType: 'code', text: 'Blocking Directive Source'},
         ];
         const details = Audit.makeTableDetails(headings, blockingDirectives);
 

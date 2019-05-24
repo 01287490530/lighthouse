@@ -5,7 +5,7 @@
  */
 'use strict';
 
-/* eslint-env mocha */
+/* eslint-env jest */
 
 const ErrorLogsAudit = require('../../audits/errors-in-console.js');
 const assert = require('assert');
@@ -17,7 +17,7 @@ describe('Console error logs audit', () => {
       RuntimeExceptions: [],
     });
     assert.equal(auditResult.rawValue, 0);
-    assert.equal(auditResult.score, true);
+    assert.equal(auditResult.score, 1);
     assert.ok(!auditResult.displayValue, 0);
     assert.equal(auditResult.details.items.length, 0);
   });
@@ -36,7 +36,7 @@ describe('Console error logs audit', () => {
       RuntimeExceptions: [],
     });
     assert.equal(auditResult.rawValue, 0);
-    assert.equal(auditResult.score, true);
+    assert.equal(auditResult.score, 1);
     assert.equal(auditResult.details.items.length, 0);
   });
 
@@ -82,23 +82,17 @@ describe('Console error logs audit', () => {
     });
 
     assert.equal(auditResult.rawValue, 3);
-    assert.equal(auditResult.score, false);
+    assert.equal(auditResult.score, 0);
     assert.equal(auditResult.details.items.length, 3);
-    assert.equal(auditResult.details.items[0][0].type, 'url');
-    assert.equal(auditResult.details.items[0][0].text, 'http://www.example.com/favicon.ico');
-    assert.equal(auditResult.details.items[0][1].type, 'code');
-    assert.equal(auditResult.details.items[0][1].text,
+    assert.equal(auditResult.details.items[0].url, 'http://www.example.com/favicon.ico');
+    assert.equal(auditResult.details.items[0].description,
       'The server responded with a status of 404 (Not Found)');
-    assert.equal(auditResult.details.items[1][0].type, 'url');
-    assert.equal(auditResult.details.items[1][0].text, 'http://www.example.com/wsconnect.ws');
-    assert.equal(auditResult.details.items[1][1].type, 'code');
-    assert.equal(auditResult.details.items[1][1].text,
+    assert.equal(auditResult.details.items[1].url, 'http://www.example.com/wsconnect.ws');
+    assert.equal(auditResult.details.items[1].description,
       'WebSocket connection failed: Unexpected response code: 500');
-    assert.equal(auditResult.details.items[2][0].type, 'url');
-    assert.equal(auditResult.details.items[2][0].text,
+    assert.equal(auditResult.details.items[2].url,
       'http://example.com/fancybox.js');
-    assert.equal(auditResult.details.items[2][1].type, 'code');
-    assert.equal(auditResult.details.items[2][1].text,
+    assert.equal(auditResult.details.items[2].description,
       'TypeError: Cannot read property \'msie\' of undefined');
   });
 
@@ -114,12 +108,12 @@ describe('Console error logs audit', () => {
       RuntimeExceptions: [],
     });
     assert.equal(auditResult.rawValue, 1);
-    assert.equal(auditResult.score, false);
+    assert.equal(auditResult.score, 0);
     assert.equal(auditResult.details.items.length, 1);
     // url is undefined
-    assert.strictEqual(auditResult.details.items[0][0].text, undefined);
+    assert.strictEqual(auditResult.details.items[0].url, undefined);
     // text is undefined
-    assert.strictEqual(auditResult.details.items[0][1].text, undefined);
+    assert.strictEqual(auditResult.details.items[0].description, undefined);
   });
 
   // Checks bug #4188
@@ -145,10 +139,10 @@ describe('Console error logs audit', () => {
       }],
     });
     assert.equal(auditResult.rawValue, 1);
-    assert.equal(auditResult.score, false);
+    assert.equal(auditResult.score, 0);
     assert.equal(auditResult.details.items.length, 1);
-    assert.strictEqual(auditResult.details.items[0][0].text, 'http://example.com/fancybox.js');
-    assert.strictEqual(auditResult.details.items[0][1].text,
+    assert.strictEqual(auditResult.details.items[0].url, 'http://example.com/fancybox.js');
+    assert.strictEqual(auditResult.details.items[0].description,
       'TypeError: Cannot read property \'msie\' of undefined');
   });
 });

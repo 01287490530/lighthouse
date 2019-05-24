@@ -60,12 +60,7 @@ module.exports = {
   },
   beginDevtoolsLog() {},
   endDevtoolsLog() {
-    return require('../fixtures/perflog.json');
-  },
-  getSecurityState() {
-    return Promise.resolve({
-      schemeIsCryptographic: true,
-    });
+    return require('../fixtures/artifacts/perflog/defaultPass.devtoolslog.json');
   },
   blockUrlPatterns() {
     return Promise.resolve();

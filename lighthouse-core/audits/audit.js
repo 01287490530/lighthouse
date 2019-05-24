@@ -3,40 +3,72 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
-// @ts-nocheck
 'use strict';
 
 const statistics = require('../lib/statistics');
+const Util = require('../report/html/renderer/util');
 
 const DEFAULT_PASS = 'defaultPass';
 
+/**
+ * Clamp figure to 2 decimal places
+ * @param {number} val
+ * @return {number}
+ */
+const clampTo2Decimals = val => Math.round(val * 100) / 100;
+
 class Audit {
   /**
-   * @return {!string}
+   * @return {string}
    */
   static get DEFAULT_PASS() {
     return DEFAULT_PASS;
   }
 
   /**
-   * @return {{NUMERIC: string, BINARY: string}}
+   * @return {LH.Audit.ScoreDisplayModes}
    */
   static get SCORING_MODES() {
     return {
       NUMERIC: 'numeric',
       BINARY: 'binary',
+      MANUAL: 'manual',
+      INFORMATIVE: 'informative',
+      NOT_APPLICABLE: 'not-applicable',
+      ERROR: 'error',
     };
   }
 
   /**
-   * @throws {Error}
+   * @return {LH.Audit.Meta}
    */
   static get meta() {
     throw new Error('Audit meta information must be overridden.');
   }
 
   /**
-   * Computes a clamped score between 0 and 100 based on the measured value. Score is determined by
+   * @return {Object}
+   */
+  static get defaultOptions() {
+    return {};
+  }
+
+  /* eslint-disable no-unused-vars */
+
+  /**
+   *
+   * @param {LH.Artifacts} artifacts
+   * @param {LH.Audit.Context} context
+   * @return {LH.Audit.Product|Promise<LH.Audit.Product>}
+   */
+  static audit(artifacts, context) {
+    throw new Error('audit() method must be overriden');
+  }
+
+  /* eslint-enable no-unused-vars */
+
+  /**
+   * Computes a clamped score between 0 and 1 based on the measured value. Score is determined by
    * considering a log-normal distribution governed by the two control points, point of diminishing
    * returns and the median value, and returning the percentage of sites that have higher value.
    *
@@ -51,137 +83,140 @@ class Audit {
       diminishingReturnsValue
     );
 
-    let score = 100 * distribution.computeComplementaryPercentile(measuredValue);
-    score = Math.min(100, score);
+    let score = distribution.computeComplementaryPercentile(measuredValue);
+    score = Math.min(1, score);
     score = Math.max(0, score);
-    return Math.round(score);
+    return clampTo2Decimals(score);
   }
 
   /**
-   * @param {!Audit} audit
-   * @param {string} debugString
-   * @return {!AuditFullResult}
+   * @param {typeof Audit} audit
+   * @param {string} errorMessage
+   * @return {LH.Audit.Result}
    */
-  static generateErrorAuditResult(audit, debugString) {
+  static generateErrorAuditResult(audit, errorMessage) {
     return Audit.generateAuditResult(audit, {
       rawValue: null,
-      error: true,
-      debugString,
+      errorMessage,
     });
   }
 
   /**
-   * Table cells will use the type specified in headings[x].itemType. However a custom type
-   * can be provided: results[x].propName = {type: 'code', text: '...'}
-   * @param {!Audit.Headings} headings
-   * @param {!Array<!Object<string, *>>} results
-   * @return {!Array<!DetailsRenderer.DetailsJSON>}
+   * @param {Array<LH.Audit.Heading>} headings
+   * @param {Array<Object<string, LH.Audit.DetailsItem>>} results
+   * @param {LH.Audit.DetailsRendererDetailsSummary=} summary
+   * @return {LH.Audit.DetailsRendererDetailsJSON}
    */
-  static makeTableRows(headings, results) {
-    const tableRows = results.map(item => {
-      return headings.map(heading => {
-        const value = item[heading.key];
-        if (typeof value === 'object' && value && value.type) return value;
+  static makeTableDetails(headings, results, summary) {
+    if (results.length === 0) {
+      return {
+        type: 'table',
+        headings: [],
+        items: [],
+        summary,
+      };
+    }
 
-        return {
-          type: heading.itemType,
-          text: value,
-        };
-      });
-    });
-    return tableRows;
-  }
-
-  /**
-   * @param {!Audit.Headings} headings
-   * @return {!Array<!DetailsRenderer.DetailsJSON>}
-   */
-  static makeTableHeaders(headings) {
-    return headings.map(heading => ({
-      type: 'text',
-      itemType: heading.itemType,
-      text: heading.text,
-    }));
-  }
-
-  /**
-   * @param {!Audit.Headings} headings
-   * @param {!Array<!Object<string, string>>} results
-   * @return {!DetailsRenderer.DetailsJSON}
-   */
-  static makeTableDetails(headings, results) {
-    const tableHeaders = Audit.makeTableHeaders(headings);
-    const tableRows = Audit.makeTableRows(headings, results);
     return {
       type: 'table',
-      header: 'View Details',
-      itemHeaders: tableHeaders,
-      items: tableRows,
+      headings: headings,
+      items: results,
+      summary,
     };
   }
 
   /**
-   * @param {!Audit} audit
-   * @param {!AuditResult} result
-   * @return {!AuditFullResult}
+   * @param {Array<LH.ResultLite.Audit.ColumnHeading>} headings
+   * @param {Array<LH.ResultLite.Audit.WastedBytesDetailsItem>|Array<LH.ResultLite.Audit.WastedTimeDetailsItem>} items
+   * @param {number} overallSavingsMs
+   * @param {number=} overallSavingsBytes
+   * @return {LH.Result.Audit.OpportunityDetails}
+   */
+  static makeOpportunityDetails(headings, items, overallSavingsMs, overallSavingsBytes) {
+    return {
+      type: 'opportunity',
+      headings: items.length === 0 ? [] : headings,
+      items,
+      overallSavingsMs,
+      overallSavingsBytes,
+    };
+  }
+
+  /**
+   * @param {typeof Audit} audit
+   * @param {LH.Audit.Product} result
+   * @return {{score: number|null, scoreDisplayMode: LH.Audit.ScoreDisplayMode}}
+   */
+  static _normalizeAuditScore(audit, result) {
+    // Cast true/false to 1/0
+    let score = result.score === undefined ? Number(result.rawValue) : result.score;
+
+    if (!Number.isFinite(score)) throw new Error(`Invalid score: ${score}`);
+    if (score > 1) throw new Error(`Audit score for ${audit.meta.id} is > 1`);
+    if (score < 0) throw new Error(`Audit score for ${audit.meta.id} is < 0`);
+
+    score = clampTo2Decimals(score);
+
+    const scoreDisplayMode = audit.meta.scoreDisplayMode || Audit.SCORING_MODES.BINARY;
+
+    return {
+      score,
+      scoreDisplayMode,
+    };
+  }
+
+  /**
+   * @param {typeof Audit} audit
+   * @param {LH.Audit.Product} result
+   * @return {LH.Audit.Result}
    */
   static generateAuditResult(audit, result) {
     if (typeof result.rawValue === 'undefined') {
       throw new Error('generateAuditResult requires a rawValue');
     }
 
-    const score = typeof result.score === 'undefined' ? result.rawValue : result.score;
-    let displayValue = result.displayValue;
-    if (typeof displayValue === 'undefined') {
-      displayValue = result.rawValue ? result.rawValue : '';
+    // TODO(bckenny): cleanup the flow of notApplicable/error/binary/numeric
+    let {score, scoreDisplayMode} = Audit._normalizeAuditScore(audit, result);
+
+    // If the audit was determined to not apply to the page, set score display mode appropriately
+    if (result.notApplicable) {
+      scoreDisplayMode = Audit.SCORING_MODES.NOT_APPLICABLE;
+      result.rawValue = true;
     }
 
-    // The same value or true should be '' it doesn't add value to the report
-    if (displayValue === score) {
-      displayValue = '';
+    if (result.errorMessage) {
+      scoreDisplayMode = Audit.SCORING_MODES.ERROR;
     }
-    let auditDescription = audit.meta.description;
-    if (audit.meta.failureDescription) {
-      if (!score || (typeof score === 'number' && score < 100)) {
-        auditDescription = audit.meta.failureDescription;
+
+    let auditTitle = audit.meta.title;
+    if (audit.meta.failureTitle) {
+      if (Number(score) < Util.PASS_THRESHOLD) {
+        auditTitle = audit.meta.failureTitle;
       }
     }
+
+    if (scoreDisplayMode !== Audit.SCORING_MODES.BINARY &&
+        scoreDisplayMode !== Audit.SCORING_MODES.NUMERIC) {
+      score = null;
+    }
+
     return {
+      id: audit.meta.id,
+      title: auditTitle,
+      description: audit.meta.description,
+
       score,
-      displayValue: `${displayValue}`,
+      scoreDisplayMode,
       rawValue: result.rawValue,
-      error: result.error,
-      debugString: result.debugString,
-      extendedInfo: result.extendedInfo,
-      scoringMode: audit.meta.scoringMode || Audit.SCORING_MODES.BINARY,
-      informative: audit.meta.informative,
-      manual: audit.meta.manual,
-      notApplicable: result.notApplicable,
-      name: audit.meta.name,
-      description: auditDescription,
-      helpText: audit.meta.helpText,
+
+      displayValue: result.displayValue,
+      explanation: result.explanation,
+      errorMessage: result.errorMessage,
+      warnings: result.warnings,
+
       details: result.details,
     };
   }
 }
 
 module.exports = Audit;
-
-/**
- * @typedef {Object} Audit.Heading
- * @property {string} key
- * @property {string} itemType
- * @property {string} text
- */
-
-/**
- * @typedef {Array<Audit.Heading>} Audit.Headings
- */
-
-/**
- * @typedef {Object} Audit.HeadingsResult
- * @property {number} results
- * @property {Audit.Headings} headings
- * @property {boolean} passes
- * @property {string=} debugString
- */

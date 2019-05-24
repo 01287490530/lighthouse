@@ -16,20 +16,32 @@
   <link rel="stylesheet" href="./dbw_tester.css?scriptActivated&delay=200"> <!-- PASS: initiator is script -->
 </template>
 
+<!-- AMP-style stylesheet script -->
+<!-- based on https://github.com/ampproject/amphtml/blob/38f1bdf4cc385f9a25cf2979abf215952880b876/src/font-stylesheet-timeout.js#L87-L103 -->
+<script type="text/javascript">
+  setTimeout(() => {
+    const stylesheet = document.getElementById('amp-style-link');
+    stylesheet.media = 'not-matching';
+    stylesheet.onload = () => stylesheet.media = 'screen';
+    stylesheet.parentNode.insertBefore(stylesheet, stylesheet.nextSibling);
+  }, 1500);
+</script>
+
 <!-- Note: these will only fail when using the static-server.js, which supports the ?delay=true param.
      If you're using your own server, the resource will load instantly and the
      stylesheets will be ignored for being below the threshold. -->
-<!-- we use a relative protocol url to test that `new URL(resource)` in the critical-request-chains.js audit can handle it -->
-<link rel="stylesheet" href="//localhost:10200/dobetterweb/dbw_tester.css?delay=100"> <!-- FAIL, when run under smokehouse -->
+<link rel="stylesheet" href="./dobetterweb/dbw_tester.css?delay=100"> <!-- FAIL, when run under smokehouse -->
 <link rel="stylesheet" href="./unknown404.css?delay=200"> <!-- FAIL -->
 <link rel="stylesheet" href="./dbw_tester.css?delay=2200"> <!-- FAIL -->
 <link rel="stylesheet" href="./dbw_disabled.css?delay=200&isdisabled" disabled> <!-- PASS -->
 <link rel="import" href="./dbw_partial_a.html?delay=200"> <!-- FAIL -->
 <link rel="import" href="./dbw_partial_b.html?delay=200&isasync" async> <!-- PASS -->
 
+<!-- FAIL: render blocking but capped at 500ms -->
+<link id="amp-style-link" rel="stylesheet" href="./dbw_tester.css?delay=3000&capped">
 <!-- PASS: preload that's activated later does not block rendering. -->
 <link rel="preload" href="./dbw_tester.css?delay=2000&async=true" as="style" onload="this.rel = 'stylesheet'">
-<!-- PASS: async stylesheet that loads after FCP -->
+<!-- PASS: async stylesheet -->
 <link rel="stylesheet" href="./dbw_tester.css?delay=3000&async=true" disabled onload="this.disabled = false">
 
 <!-- FAIL: block rendering -->
@@ -90,6 +102,9 @@
   </style>
 </template>
 
+<!-- Force FCP to be ~5s out, necessary to make sure our render-blocking audits still work -->
+<!-- even when other forces were responsible for delaying the render. -->
+<script src="./fcp-delayer.js?delay=5000"></script>
 </head>
 <body>
 
@@ -110,8 +125,14 @@
   <a href="https://www.google.com/" target="_blank" rel="nofollow">external link</a>
   <!-- PASS - external link correctly uses rel="noopener" and an additional rel value -->
   <a href="https://www.google.com/" target="_blank" rel="noopener nofollow">external link that uses rel noopener and another unrelated rel attribute</a>
+  <!-- PASS - external link correctly uses rel="noreferrer" and an additional rel value -->
+  <a href="https://www.google.com/" target="_blank" rel="noreferrer nofollow">external link that uses rel noreferrer and another unrelated rel attribute</a>
   <!-- PASS - external link correctly uses rel="noopener" -->
   <a href="https://www.google.com/" target="_blank" rel="noopener">external link that uses rel noopener</a>
+  <!-- PASS - external link correctly uses rel="noreferrer" -->
+  <a href="https://www.google.com/" target="_blank" rel="noreferrer">external link that uses rel noreferrer</a>
+  <!-- PASS - external link correctly uses rel="noopener" and rel="noreferrer" -->
+  <a href="https://www.google.com/" target="_blank" rel="noopener noreferrer">external link that uses rel noopener and noreferrer</a>
   <!-- PASS - internal link without rel="noopener" -->
   <a href="./doesnotexist" target="_blank">internal link is ok</a>
   <!-- PASS - href uses javascript: -->
@@ -135,6 +156,8 @@
 <!-- PASS(image-aspect-ratio) -->
 <img src="lighthouse-480x318.jpg" width="480" height="318">
 
+<!-- FAIL(efficient-animated-content): animated gif found -->
+<img src="lighthouse-rotating.gif" width="811" height="462">
 
 <!-- Some websites overwrite the original Error object. The captureJSCallUsage function
   relies on the native Error object and prepareStackTrace from V8. When overwriting the stack
@@ -183,39 +206,6 @@ function documentWriteTest() {
 
 function websqlTest() {
   const db = openDatabase('mydb', '1.0', 'my first database', 1024);
-}
-
-function mutationEvenTest() {
-  // FAIL
-  document.addEventListener('DOMNodeInserted', function(e) {
-    console.log('DOMNodeInserted');
-  });
-
-  // FAIL
-  document.addEventListener('DOMNodeRemoved', function(e) {
-    console.log('DOMNodeRemoved');
-  });
-
-  // FAIL
-  document.body.addEventListener('DOMNodeInserted', function(e) {
-    console.log('DOMNodeInserted');
-  });
-
-  // FAIL
-  const el = document.querySelector('#touchmove-section');
-  el.addEventListener('DOMNodeInserted', function(e) {
-    console.log('DOMNodeInserted on element');
-  });
-
-  // FAIL
-  window.addEventListener('DOMNodeInserted', function(e) {
-    console.log('DOMNodeInserted');
-  });
-
-  // PASS - not MutationEvents
-  window.addEventListener('DOMContentLoaded', function(e) {
-    console.log('DOMContentLoaded');
-  });
 }
 
 function passiveEventsListenerTest() {
@@ -312,11 +302,6 @@ function deprecationsTest() {
 
   // TODO: some deprecated API messages are not currently being logged correctly.
   // See: https://crbug.com/680832
-  try {
-    MediaStreamTrack.getSources(); // Should eventually FAIL
-  } catch(e) {}
-
-  console.timeline(); // Should eventually FAIL
 
   // FAIL
   const xhr = new XMLHttpRequest();
@@ -341,7 +326,6 @@ if (location.search === '') {
   dateNowTest();
   consoleTimeTest();
   websqlTest();
-  mutationEvenTest();
   passiveEventsListenerTest();
   geolocationOnStartTest();
   notificationOnStartTest();
@@ -363,9 +347,6 @@ if (location.search === '') {
   }
   if (params.has('websql')) {
     websqlTest();
-  }
-  if (params.has('mutationEvents')) {
-    mutationEvenTest();
   }
   if (params.has('passiveEvents')) {
     passiveEventsListenerTest();

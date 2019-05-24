@@ -10,26 +10,18 @@ const Connection = require('./connection.js');
 /* eslint-disable no-unused-vars */
 
 /**
- * @interface
+ * @typedef {object} Port
+ * @property {(eventName: 'message'|'close', cb: ((arg: string) => void) | (() => void)) => void} on
+ * @property {(message: string) => void} send
+ * @property {() => void} close
  */
-class Port {
-  /**
-   * @param {!string} eventName, 'message', 'close'
-   * @param {function(string|undefined)} cb
-   */
-  on(eventName, cb) { }
-
-  /**
-   * @param {string} message
-   */
-  send(message) { }
-
-  close() { }
-}
 
 /* eslint-enable no-unused-vars */
 
 class RawConnection extends Connection {
+  /**
+   * @param {Port} port
+   */
   constructor(port) {
     super();
     this._port = port;
@@ -39,14 +31,14 @@ class RawConnection extends Connection {
 
   /**
    * @override
-   * @return {!Promise}
+   * @return {Promise<void>}
    */
   connect() {
     return Promise.resolve();
   }
 
   /**
-   * @override
+   * @return {Promise<void>}
    */
   disconnect() {
     this._port.close();
@@ -56,6 +48,7 @@ class RawConnection extends Connection {
   /**
    * @override
    * @param {string} message
+   * @protected
    */
   sendRawMessage(message) {
     this._port.send(message);

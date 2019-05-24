@@ -8,7 +8,7 @@
 const assert = require('assert');
 const ReportScoring = require('../scoring');
 
-/* eslint-env mocha */
+/* eslint-env jest */
 describe('ReportScoring', () => {
   describe('#arithmeticMean', () => {
     it('should work for empty list', () => {
@@ -17,82 +17,74 @@ describe('ReportScoring', () => {
 
     it('should work for equal weights', () => {
       assert.equal(ReportScoring.arithmeticMean([
-        {score: 10, weight: 1},
-        {score: 20, weight: 1},
-        {score: 3, weight: 1},
-      ]), 11);
+        {score: 0.1, weight: 1},
+        {score: 0.2, weight: 1},
+        {score: 0.03, weight: 1},
+      ]), 0.11);
     });
 
     it('should work for varying weights', () => {
       assert.equal(ReportScoring.arithmeticMean([
-        {score: 10, weight: 2},
+        {score: 0.1, weight: 2},
         {score: 0, weight: 7},
-        {score: 20, weight: 1},
-      ]), 4);
-    });
-
-    it('should work for missing values', () => {
-      assert.equal(ReportScoring.arithmeticMean([
-        {weight: 1},
-        {score: 30, weight: 1},
-        {weight: 1},
-        {score: 100},
-      ]), 10);
+        {score: 0.2, weight: 1},
+      ]), 0.04);
     });
   });
 
   describe('#scoreAllCategories', () => {
-    it('should return a score', () => {
-      const result = ReportScoring.scoreAllCategories({
-        categories: {
-          'categoryA': {weight: 1, audits: [{id: 'auditA', weight: 1}]},
-          'categoryB': {weight: 4, audits: [{id: 'auditB', weight: 1}]},
-          'categoryC': {audits: []},
-        },
-      }, {auditA: {score: 50}, auditB: {score: 100}});
-
-      assert.equal(result.score, 90);
-    });
-
-    it('should return categories', () => {
-      const result = ReportScoring.scoreAllCategories({
-        categories: {
-          'my-category': {name: 'My Category', audits: []},
-          'my-other-category': {description: 'It is a nice category', audits: []},
-        },
-      }, {});
-
-      assert.equal(result.categories.length, 2);
-      assert.equal(result.categories[0].name, 'My Category');
-      assert.equal(result.categories[1].description, 'It is a nice category');
-    });
-
     it('should score the categories', () => {
       const resultsByAuditId = {
-        'my-audit': {rawValue: 'you passed'},
-        'my-boolean-audit': {score: true, extendedInfo: {}},
-        'my-scored-audit': {score: 100},
-        'my-failed-audit': {score: 20},
-        'my-boolean-failed-audit': {score: false},
+        'my-audit': {rawValue: 'you passed', score: 0},
+        'my-boolean-audit': {score: 1, extendedInfo: {}},
+        'my-scored-audit': {score: 1},
+        'my-failed-audit': {score: 0.2},
+        'my-boolean-failed-audit': {score: 0},
       };
 
-      const result = ReportScoring.scoreAllCategories({
-        categories: {
-          'my-category': {audits: [{id: 'my-audit'}]},
-          'my-scored': {
-            audits: [
-              {id: 'my-boolean-audit', weight: 1},
-              {id: 'my-scored-audit', weight: 1},
-              {id: 'my-failed-audit', weight: 1},
-              {id: 'my-boolean-failed-audit', weight: 1},
-            ],
-          },
+      const categories = {
+        categoryA: {auditRefs: [{id: 'my-audit'}]},
+        categoryB: {
+          auditRefs: [
+            {id: 'my-boolean-audit', weight: 1},
+            {id: 'my-scored-audit', weight: 1},
+            {id: 'my-failed-audit', weight: 1},
+            {id: 'my-boolean-failed-audit', weight: 1},
+          ],
         },
-      }, resultsByAuditId);
+      };
 
-      assert.equal(result.categories.length, 2);
-      assert.equal(result.categories[0].score, 0);
-      assert.equal(result.categories[1].score, 55);
+      const scoredCategories = ReportScoring.scoreAllCategories(categories, resultsByAuditId);
+
+      assert.equal(scoredCategories.categoryA.id, 'categoryA');
+      assert.equal(scoredCategories.categoryA.score, 0);
+      assert.equal(scoredCategories.categoryB.id, 'categoryB');
+      assert.equal(scoredCategories.categoryB.score, 0.55);
+    });
+
+    it('should weight notApplicable audits as 0', () => {
+      const resultsByAuditId = {
+        'my-boolean-audit': {score: 1, extendedInfo: {}, scoreDisplayMode: 'not-applicable'},
+        'my-scored-audit': {score: 1},
+        'my-failed-audit': {score: 0.2, scoreDisplayMode: 'not-applicable'},
+        'my-boolean-failed-audit': {score: 0},
+      };
+
+      const categories = {
+        categoryA: {
+          auditRefs: [
+            {id: 'my-boolean-audit', weight: 1},
+            {id: 'my-scored-audit', weight: 1},
+            {id: 'my-failed-audit', weight: 1},
+            {id: 'my-boolean-failed-audit', weight: 1},
+          ],
+        },
+      };
+
+      const scoredCategories = ReportScoring.scoreAllCategories(categories, resultsByAuditId);
+
+      assert.equal(scoredCategories.categoryA.id, 'categoryA');
+      assert.equal(scoredCategories.categoryA.score, 0.5);
     });
   });
 });

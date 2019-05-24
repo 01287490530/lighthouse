@@ -3,6 +3,7 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
+// @ts-nocheck
 'use strict';
 
 /* eslint-disable no-console */
@@ -23,16 +24,22 @@ function requestHandler(request, response) {
   const queryString = requestUrl.search && parseQueryString(requestUrl.search.slice(1));
   let absoluteFilePath = path.join(__dirname, filePath);
 
+  if (filePath.startsWith('/lighthouse-viewer')) {
+    // Rewrite lighthouse-viewer paths to point to that location.
+    absoluteFilePath = path.join(__dirname, '/../../../', filePath);
+  }
+
   if (filePath === '/zone.js') {
     // evaluateAsync previously had a bug that LH would fail if a page polyfilled Promise.
     // We bring in an aggressive Promise polyfill (zone) to ensure we don't still fail.
     const zonePath = '../../../node_modules/zone.js';
     absoluteFilePath = path.join(__dirname, `${zonePath}/dist/zone.js`);
-  }
-
-  // Disallow file requests outside of LH folder
-  if (!path.parse(absoluteFilePath).dir.startsWith(lhRootDirPath)) {
-    return readFileCallback(new Error('Disallowed path'));
+  } else {
+    // Otherwise, disallow file requests outside of LH folder or from node_modules
+    const filePathDir = path.parse(absoluteFilePath).dir;
+    if (!filePathDir.startsWith(lhRootDirPath) || filePathDir.includes('node_modules')) {
+      return readFileCallback(new Error('Disallowed path'));
+    }
   }
 
   fs.exists(absoluteFilePath, fsExistsCallback);
@@ -53,7 +60,7 @@ function requestHandler(request, response) {
   }
 
   function sendResponse(statusCode, data) {
-    const headers = {};
+    const headers = {'Access-Control-Allow-Origin': '*'};
 
     if (filePath.endsWith('.js')) {
       headers['Content-Type'] = 'text/javascript';
@@ -122,6 +129,16 @@ const serverForOffline = http.createServer(requestHandler);
 serverForOnline.on('error', e => console.error(e.code, e));
 serverForOffline.on('error', e => console.error(e.code, e));
 
-// Listen
-serverForOnline.listen(10200, 'localhost');
-serverForOffline.listen(10503, 'localhost');
+
+// If called via `node static-server.js` then start listening, otherwise, just expose the servers
+if (require.main === module) {
+  // Start listening
+  serverForOnline.listen(10200, 'localhost');
+  serverForOffline.listen(10503, 'localhost');
+} else {
+  module.exports = {
+    server: serverForOnline,
+    serverForOffline,
+  };
+}
+

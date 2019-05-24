@@ -3,6 +3,8 @@
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
  */
+// eslint-disable-next-line spaced-comment
+/// <reference types="chrome" />
 'use strict';
 
 const Connection = require('./connection.js');
@@ -19,17 +21,36 @@ class ExtensionConnection extends Connection {
     this._onUnexpectedDetach = this._onUnexpectedDetach.bind(this);
   }
 
+  /**
+   * @param {chrome.debugger.Debuggee} source
+   * @param {string} method
+   * @param {object=} params
+   * @private
+   */
   _onEvent(source, method, params) {
     // log events received
     log.log('<=', method, params);
-    this.emitNotification(method, params);
+
+    // Warning: type cast, assuming that debugger API is giving us a valid protocol event.
+    // Must be cast together since types of `params` and `method` come as a pair.
+    const eventMessage = /** @type {LH.Protocol.RawEventMessage} */({method, params});
+    this.emitProtocolEvent(eventMessage);
   }
 
-  _onUnexpectedDetach(debuggee, detachReason) {
+  /**
+   * @param {chrome.debugger.Debuggee} source
+   * @param {string} detachReason
+   * @return {never}
+   * @private
+   */
+  _onUnexpectedDetach(source, detachReason) {
     this._detachCleanup();
     throw new Error('Lighthouse detached from browser: ' + detachReason);
   }
 
+  /**
+   * @private
+   */
   _detachCleanup() {
     this._tabId = null;
     chrome.debugger.onEvent.removeListener(this._onEvent);
@@ -39,25 +60,25 @@ class ExtensionConnection extends Connection {
 
   /**
    * @override
-   * @return {!Promise}
+   * @return {Promise<void>}
    */
   connect() {
     if (this._tabId !== null) {
       return Promise.resolve();
     }
 
-    return this._queryCurrentTab()
-      .then(tab => {
-        const tabId = this._tabId = tab.id;
+    return this._getCurrentTabId()
+      .then(tabId => {
+        this._tabId = tabId;
         chrome.debugger.onEvent.addListener(this._onEvent);
         chrome.debugger.onDetach.addListener(this._onUnexpectedDetach);
 
         return new Promise((resolve, reject) => {
-          chrome.debugger.attach({tabId}, '1.1', _ => {
+          chrome.debugger.attach({tabId}, '1.1', () => {
             if (chrome.runtime.lastError) {
               return reject(new Error(chrome.runtime.lastError.message));
             }
-            resolve(tabId);
+            resolve();
           });
         });
       });
@@ -65,7 +86,7 @@ class ExtensionConnection extends Connection {
 
   /**
    * @override
-   * @return {!Promise}
+   * @return {Promise<void>}
    */
   disconnect() {
     if (this._tabId === null) {
@@ -75,7 +96,7 @@ class ExtensionConnection extends Connection {
 
     const tabId = this._tabId;
     return new Promise((resolve, reject) => {
-      chrome.debugger.detach({tabId}, _ => {
+      chrome.debugger.detach({tabId}, () => {
         if (chrome.runtime.lastError) {
           return reject(new Error(chrome.runtime.lastError.message));
         }
@@ -87,39 +108,9 @@ class ExtensionConnection extends Connection {
   }
 
   /**
-   * @override
-   * @param {!string} command
-   * @param {!Object} params
-   * @return {!Promise}
+   * @return {Promise<chrome.tabs.Tab>}
+   * @private
    */
-  sendCommand(command, params) {
-    return new Promise((resolve, reject) => {
-      log.formatProtocol('method => browser', {method: command, params: params}, 'verbose');
-      if (!this._tabId) {
-        log.error('ExtensionConnection', 'No tabId set for sendCommand');
-      }
-
-      chrome.debugger.sendCommand({tabId: this._tabId}, command, params, result => {
-        if (chrome.runtime.lastError) {
-          // The error from the extension has a `message` property that is the
-          // stringified version of the actual protocol error object.
-          const message = chrome.runtime.lastError.message;
-          let errorMessage;
-          try {
-            errorMessage = JSON.parse(message).message;
-          } catch (e) {}
-          errorMessage = errorMessage || message || 'Unknown debugger protocol error.';
-
-          log.formatProtocol('method <= browser ERR', {method: command}, 'error');
-          return reject(new Error(`Protocol error (${command}): ${errorMessage}`));
-        }
-
-        log.formatProtocol('method <= browser OK', {method: command, params: result}, 'verbose');
-        resolve(result);
-      });
-    });
-  }
-
   _queryCurrentTab() {
     return new Promise((resolve, reject) => {
       const queryOpts = {
@@ -131,29 +122,103 @@ class ExtensionConnection extends Connection {
         if (chrome.runtime.lastError) {
           return reject(chrome.runtime.lastError);
         }
+
+        const errMessage = 'Couldn\'t resolve current tab. Check your URL, reload, and try again.';
         if (tabs.length === 0) {
-          const message = 'Couldn\'t resolve current tab. Check your URL, reload, and try again.';
-          return reject(new Error(message));
+          return reject(new Error(errMessage));
         }
         if (tabs.length > 1) {
           log.warn('ExtensionConnection', '_queryCurrentTab returned multiple tabs');
         }
-        resolve(tabs[0]);
+
+        const firstUrledTab = tabs.find(tab => !!tab.url);
+        if (!firstUrledTab) {
+          const tabIds = tabs.map(tab => tab.id).join(', ');
+          const message = errMessage + ` Found ${tabs.length} tab(s) with id(s) [${tabIds}].`;
+          return reject(new Error(message));
+        }
+
+        resolve(firstUrledTab);
       }));
     });
   }
 
   /**
+   * @return {Promise<number>}
+   * @private
+   */
+  _getCurrentTabId() {
+    return this._queryCurrentTab().then(tab => {
+      if (tab.id === undefined) {
+        throw new Error('Unable to resolve current tab ID. Check the tab, reload, and try again.');
+      }
+
+      return tab.id;
+    });
+  }
+
+  /**
    * Used by lighthouse-ext-background to kick off the run on the current page
+   * @return {Promise<string>}
    */
   getCurrentTabURL() {
     return this._queryCurrentTab().then(tab => {
       if (!tab.url) {
         log.error('ExtensionConnection', 'getCurrentTabURL returned empty string', tab);
+        throw new Error('getCurrentTabURL returned empty string');
       }
       return tab.url;
     });
   }
 }
+
+/**
+ * @typedef {LH.CrdpCommands[keyof LH.CrdpCommands]} CommandInfo
+ */
+// Declared outside class body because function expressions can be typed via coercive @type
+/**
+ * Looser-typed internal implementation of `ExtensionConnection.sendCommand`
+ * which is strictly typed externally on exposed ExtensionConnection interface.
+ * See `Driver.sendCommand` for explanation.
+ * @this {ExtensionConnection}
+ * @param {keyof LH.CrdpCommands} method
+ * @param {CommandInfo['paramsType']=} params,
+ * @return {Promise<CommandInfo['returnType']>}
+ */
+function _sendCommand(method, params) {
+  return new Promise((resolve, reject) => {
+    log.formatProtocol('method => browser', {method, params}, 'verbose');
+    if (!this._tabId) { // eslint-disable-line no-invalid-this
+      log.error('ExtensionConnection', 'No tabId set for sendCommand');
+      return reject(new Error('No tabId set for sendCommand'));
+    }
+
+    // eslint-disable-next-line no-invalid-this
+    chrome.debugger.sendCommand({tabId: this._tabId}, method, params || {}, result => {
+      if (chrome.runtime.lastError) {
+        // The error from the extension has a `message` property that is the
+        // stringified version of the actual protocol error object.
+        const message = chrome.runtime.lastError.message || '';
+        let errorMessage;
+        try {
+          errorMessage = JSON.parse(message).message;
+        } catch (e) {}
+        errorMessage = errorMessage || message || 'Unknown debugger protocol error.';
+
+        log.formatProtocol('method <= browser ERR', {method}, 'error');
+        return reject(new Error(`Protocol error (${method}): ${errorMessage}`));
+      }
+
+      log.formatProtocol('method <= browser OK', {method, params: result}, 'verbose');
+      resolve(result);
+    });
+  });
+}
+
+/**
+ * Call protocol methods.
+ * @type {LH.Protocol.SendCommand}
+ */
+ExtensionConnection.prototype.sendCommand = _sendCommand;
 
 module.exports = ExtensionConnection;

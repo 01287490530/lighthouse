@@ -5,6 +5,8 @@
  */
 'use strict';
 
+/** @typedef {void|LH.GathererArtifacts[keyof LH.GathererArtifacts]} PhaseResult */
+
 /**
  * Base class for all gatherers; defines pass lifecycle methods. The artifact
  * from the gatherer is the last not-undefined value returned by a lifecycle
@@ -18,9 +20,10 @@
  */
 class Gatherer {
   /**
-   * @return {string}
+   * @return {keyof LH.GathererArtifacts}
    */
   get name() {
+    // @ts-ignore - assume that class name has been added to LH.GathererArtifacts.
     return this.constructor.name;
   }
 
@@ -28,26 +31,28 @@ class Gatherer {
 
   /**
    * Called before navigation to target url.
-   * @param {!Object} options
+   * @param {LH.Gatherer.PassContext} passContext
+   * @return {PhaseResult|Promise<PhaseResult>}
    */
-  beforePass(options) { }
+  beforePass(passContext) { }
 
   /**
    * Called after target page is loaded. If a trace is enabled for this pass,
    * the trace is still being recorded.
-   * @param {!Object} options
+   * @param {LH.Gatherer.PassContext} passContext
+   * @return {PhaseResult|Promise<PhaseResult>}
    */
-  pass(options) { }
+  pass(passContext) { }
 
   /**
    * Called after target page is loaded, all gatherer `pass` methods have been
    * executed, and — if generated in this pass — the trace is ended. The trace
    * and record of network activity are provided in `loadData`.
-   * @param {!Object} options
-   * @param {{networkRecords: !Array, trace: {traceEvents: !Array}}} loadData
-   * @return {*|!Promise<*>}
+   * @param {LH.Gatherer.PassContext} passContext
+   * @param {LH.Gatherer.LoadData} loadData
+   * @return {PhaseResult|Promise<PhaseResult>}
    */
-  afterPass(options, loadData) { }
+  afterPass(passContext, loadData) { }
 
   /* eslint-enable no-unused-vars */
 }

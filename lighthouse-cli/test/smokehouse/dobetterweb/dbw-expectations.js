@@ -10,52 +10,36 @@
  */
 module.exports = [
   {
-    initialUrl: 'http://localhost:10200/dobetterweb/dbw_tester.html',
-    url: 'http://localhost:10200/dobetterweb/dbw_tester.html',
+    requestedUrl: 'http://localhost:10200/dobetterweb/dbw_tester.html',
+    finalUrl: 'http://localhost:10200/dobetterweb/dbw_tester.html',
     audits: {
       'errors-in-console': {
-        score: false,
-        // TODO: should be 5 after m64 (see note in dbw_tester.js)
-        rawValue: 4,
-        displayValue: '4',
+        score: 0,
         details: {
           items: {
-            length: 4,
+            length: 6,
           },
         },
       },
       'is-on-https': {
-        score: false,
-        extendedInfo: {
-          value: {
+        score: 0,
+        details: {
+          items: {
             length: 1,
           },
         },
       },
       'uses-http2': {
-        score: false,
-        extendedInfo: {
-          value: {
-            results: {
-              length: 16,
-            },
-          },
-        },
+        score: 0,
         details: {
           items: {
-            length: 16,
+            length: '>15',
           },
         },
       },
       'external-anchors-use-rel-noopener': {
-        score: false,
-        debugString: 'Lighthouse was unable to determine the destination of some anchor tags. ' +
-                     'If they are not used as hyperlinks, consider removing the _blank target.',
-        extendedInfo: {
-          value: {
-            length: 3,
-          },
-        },
+        score: 0,
+        warnings: [/Unable to determine.*<a target="_blank">/],
         details: {
           items: {
             length: 3,
@@ -63,57 +47,22 @@ module.exports = [
         },
       },
       'appcache-manifest': {
-        score: false,
-        debugString: 'Found <html manifest="clock.appcache">.',
+        score: 0,
+        displayValue: 'Found "clock.appcache"',
       },
       'geolocation-on-start': {
-        score: false,
-      },
-      'link-blocking-first-paint': {
         score: 0,
-        extendedInfo: {
-          value: {
-            results: {
-              length: 4,
-            },
-          },
-        },
-        details: {
-          items: {
-            length: 4,
-          },
-        },
       },
       'no-document-write': {
-        score: false,
-        extendedInfo: {
-          value: {
-            length: 3,
-          },
-        },
+        score: 0,
         details: {
           items: {
             length: 3,
-          },
-        },
-      },
-      'no-mutation-events': {
-        score: false,
-        extendedInfo: {
-          value: {
-            results: {
-              length: 6,
-            },
-          },
-        },
-        details: {
-          items: {
-            length: 6,
           },
         },
       },
       'no-vulnerable-libraries': {
-        score: false,
+        score: 0,
         details: {
           items: {
             length: 1,
@@ -121,32 +70,25 @@ module.exports = [
         },
       },
       'no-websql': {
-        score: false,
-        debugString: 'Found database "mydb", version: 1.0.',
+        score: 0,
+        displayValue: 'Found "mydb" (v1.0)',
       },
       'notification-on-start': {
-        score: false,
+        score: 0,
       },
-      'script-blocking-first-paint': {
-        // TODO: re-enable score assertions when we have more flexible assertions like < 100
-        // score: 90,
-        extendedInfo: {
-          value: {
-            results: {
-              length: 1,
-            },
-          },
-        },
+      'render-blocking-resources': {
+        score: '<1',
+        rawValue: '>100',
         details: {
           items: {
-            length: 1,
+            length: 7,
           },
         },
       },
       'uses-passive-event-listeners': {
-        score: false,
-        extendedInfo: {
-          value: {
+        score: 0,
+        details: {
+          items: {
             // Note: Originally this was 7 but M56 defaults document-level
             // listeners to passive. See https://www.chromestatus.com/features/5093566007214080
             // Note: It was 4, but {passive:false} doesn't get a warning as of M63: crbug.com/770208
@@ -156,12 +98,7 @@ module.exports = [
         },
       },
       'deprecations': {
-        score: false,
-        extendedInfo: {
-          value: {
-            length: 3,
-          },
-        },
+        score: 0,
         details: {
           items: {
             length: 3,
@@ -169,154 +106,36 @@ module.exports = [
         },
       },
       'password-inputs-can-be-pasted-into': {
-        score: false,
-        extendedInfo: {
-          value: {
+        score: 0,
+        details: {
+          items: {
             length: 2,
           },
         },
       },
       'image-aspect-ratio': {
-        score: false,
+        score: 0,
         details: {
           items: {
             0: {
-              2: {
-                text: /^480 x 57/,
-              },
+              displayedAspectRatio: /^480 x 57/,
             },
             length: 1,
           },
         },
       },
-    },
-  }, {
-    initialUrl: 'http://localhost:10200/dobetterweb/domtester.html?smallDOM',
-    url: 'http://localhost:10200/dobetterweb/domtester.html?smallDOM',
-    audits: {
-      'dom-size': {
-        score: 100,
-        extendedInfo: {
-          value: {
-            0: {value: '1,324'},
-            1: {value: '7'},
-            2: {value: '1,303'},
-          },
-        },
+      'efficient-animated-content': {
+        score: '<0.5',
         details: {
-          items: {
-            0: {value: '1,324'},
-            1: {value: '7'},
-            2: {value: '1,303'},
-          },
+          overallSavingsMs: '>2000',
+          items: [
+            {
+              url: 'http://localhost:10200/dobetterweb/lighthouse-rotating.gif',
+              totalBytes: 934285,
+              wastedBytes: 682028,
+            },
+          ],
         },
-      },
-    },
-  }, {
-    initialUrl: 'http://localhost:10200/dobetterweb/domtester.html?largeDOM&withShadowDOM',
-    url: 'http://localhost:10200/dobetterweb/domtester.html?largeDOM&withShadowDOM',
-    audits: {
-      'dom-size': {
-        score: 0,
-        extendedInfo: {
-          value: {
-            0: {value: '6,037'},
-            1: {value: '9'},
-            2: {value: '6,003'},
-          },
-        },
-        details: {
-          items: {
-            0: {value: '6,037'},
-            1: {value: '9'},
-            2: {value: '6,003'},
-          },
-        },
-      },
-    },
-  }, {
-    initialUrl: 'http://localhost:10200/dobetterweb/domtester.html?withShadowDOM',
-    url: 'http://localhost:10200/dobetterweb/domtester.html?withShadowDOM',
-    audits: {
-      'dom-size': {
-        score: 100,
-        extendedInfo: {
-          value: {
-            0: {value: '37'},
-            1: {value: '9'},
-            2: {value: '9'},
-          },
-        },
-        details: {
-          items: {
-            0: {value: '37'},
-            1: {value: '9'},
-            2: {value: '9'},
-          },
-        },
-      },
-    },
-  }, {
-    initialUrl: 'http://localhost:10200/dobetterweb/domtester.html?ShadowRootWithManyChildren',
-    url: 'http://localhost:10200/dobetterweb/domtester.html?ShadowRootWithManyChildren',
-    audits: {
-      'dom-size': {
-        score: 100,
-        extendedInfo: {
-          value: {
-            0: {value: '33'},
-            1: {value: '7'},
-            2: {value: '9'},
-          },
-        },
-        details: {
-          items: {
-            0: {value: '33'},
-            1: {value: '7'},
-            2: {value: '9'},
-          },
-        },
-      },
-    },
-  }, {
-    initialUrl: 'http://localhost:10200/online-only.html',
-    url: 'http://localhost:10200/online-only.html',
-    audits: {
-      'is-on-https': {
-        score: true,
-      },
-      'uses-http2': {
-        score: false,
-      },
-      'external-anchors-use-rel-noopener': {
-        score: true,
-      },
-      'appcache-manifest': {
-        score: true,
-      },
-      'geolocation-on-start': {
-        score: true,
-      },
-      'link-blocking-first-paint': {
-        score: 100,
-      },
-      'no-document-write': {
-        score: true,
-      },
-      'no-mutation-events': {
-        score: true,
-      },
-      'no-websql': {
-        score: true,
-      },
-      'script-blocking-first-paint': {
-        score: 100,
-      },
-      'uses-passive-event-listeners': {
-        score: true,
-      },
-      'password-inputs-can-be-pasted-into': {
-        score: true,
       },
     },
   },

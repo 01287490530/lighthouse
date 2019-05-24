@@ -8,7 +8,7 @@
 const DeprecationsAudit = require('../../audits/deprecations.js');
 const assert = require('assert');
 
-/* eslint-env mocha */
+/* eslint-env jest */
 
 describe('Console deprecations audit', () => {
   it('passes when no console messages were found', () => {
@@ -16,7 +16,6 @@ describe('Console deprecations audit', () => {
       ChromeConsoleMessages: [],
     });
     assert.equal(auditResult.rawValue, true);
-    assert.ok(!auditResult.debugString);
     assert.equal(auditResult.details.items.length, 0);
   });
 
@@ -34,9 +33,8 @@ describe('Console deprecations audit', () => {
     assert.equal(auditResult.rawValue, false);
     assert.equal(auditResult.displayValue, '1 warning found');
     assert.equal(auditResult.details.items.length, 1);
-    assert.equal(auditResult.details.items[0][1].type, 'url');
-    assert.equal(auditResult.details.items[0][1].text, undefined);
-    assert.equal(auditResult.details.items[0][2].text, undefined);
+    assert.equal(auditResult.details.items[0].url, '');
+    assert.equal(auditResult.details.items[0].lineNumber, undefined);
   });
 
   it('fails when deprecation messages are found', () => {
@@ -71,7 +69,7 @@ describe('Console deprecations audit', () => {
     assert.equal(auditResult.rawValue, false);
     assert.equal(auditResult.displayValue, '2 warnings found');
     assert.equal(auditResult.details.items.length, 2);
-    assert.equal(auditResult.details.items[0][1].text, URL);
-    assert.equal(auditResult.details.items[0][2].text, 123);
+    assert.equal(auditResult.details.items[0].url, URL);
+    assert.equal(auditResult.details.items[0].lineNumber, 123);
   });
 });

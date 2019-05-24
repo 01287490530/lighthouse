@@ -6,7 +6,7 @@
 'use strict';
 
 /**
- * Config file for running PWA smokehouse audits.
+ * Config file for running byte efficiency smokehouse audits.
  */
 module.exports = {
   extends: 'lighthouse:full',
@@ -15,11 +15,15 @@ module.exports = {
       'offscreen-images',
       'uses-webp-images',
       'uses-optimized-images',
+      'uses-text-compression',
       'uses-responsive-images',
       'unminified-css',
       'unminified-javascript',
       'unused-css-rules',
       'unused-javascript',
     ],
+
+    // TODO(phulce): re-write testers to work with faster lantern loading
+    throttlingMethod: 'devtools',
   },
 };

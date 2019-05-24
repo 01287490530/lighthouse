@@ -14,16 +14,16 @@ const AxeAudit = require('./axe-audit');
 
 class DocumentTitle extends AxeAudit {
   /**
-   * @return {!AuditMeta}
+   * @return {LH.Audit.Meta}
    */
   static get meta() {
     return {
-      name: 'document-title',
-      description: 'Document has a `<title>` element',
-      failureDescription: 'Document does not have a `<title>` element',
-      helpText: 'Screen reader users use page titles to get an overview of the contents of ' +
-          'the page. ' +
-          '[Learn more](https://dequeuniversity.com/rules/axe/2.2/document-title?application=lighthouse).',
+      id: 'document-title',
+      title: 'Document has a `<title>` element',
+      failureTitle: 'Document doesn\'t have a `<title>` element',
+      description: 'The title gives screen reader users an overview of the page, and search ' +
+          'engine users rely on it heavily to determine if a page is relevant to their search. ' +
+          '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/title).',
       requiredArtifacts: ['Accessibility'],
     };
   }

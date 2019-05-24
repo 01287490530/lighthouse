@@ -14,49 +14,52 @@ const Audit = require('../audit');
 
 class AxeAudit extends Audit {
   /**
-   * @param {!Artifacts} artifacts Accessibility gatherer artifacts. Note that AxeAudit
+   * @param {LH.Artifacts} artifacts Accessibility gatherer artifacts. Note that AxeAudit
    * expects the meta name for the class to match the rule id from aXe.
-   * @return {!AuditResult}
+   * @return {LH.Audit.Product}
    */
   static audit(artifacts) {
     // Indicate if a test is not applicable.
     // This means aXe did not find any nodes which matched these checks.
     // Note in Lighthouse we use the phrasing "Not Applicable" (aXe uses "inapplicable", which sounds weird).
     const notApplicables = artifacts.Accessibility.notApplicable || [];
-    const isNotApplicable = notApplicables.find(result => result.id === this.meta.name);
+    const isNotApplicable = notApplicables.find(result => result.id === this.meta.id);
     if (isNotApplicable) {
       return {
-        rawValue: false,
+        rawValue: true,
         notApplicable: true,
       };
     }
 
     const violations = artifacts.Accessibility.violations || [];
-    const rule = violations.find(result => result.id === this.meta.name);
+    const rule = violations.find(result => result.id === this.meta.id);
+    const impact = rule && rule.impact;
+    const tags = rule && rule.tags;
 
-    let nodeDetails = [];
+    /** @type {Array<{node: LH.Audit.DetailsRendererNodeDetailsJSON}>}>} */
+    let items = [];
     if (rule && rule.nodes) {
-      nodeDetails = rule.nodes.map(node => ({
-        type: 'node',
-        selector: Array.isArray(node.target) ? node.target.join(' ') : '',
-        path: node.path,
-        snippet: node.snippet,
+      items = rule.nodes.map(node => ({
+        node: /** @type {LH.Audit.DetailsRendererNodeDetailsJSON} */ ({
+          type: 'node',
+          selector: Array.isArray(node.target) ? node.target.join(' ') : '',
+          path: node.path,
+          snippet: node.html || node.snippet,
+          explanation: node.failureSummary,
+        }),
       }));
     }
+
+    const headings = [
+      {key: 'node', itemType: 'node', text: 'Failing Elements'},
+    ];
 
     return {
       rawValue: typeof rule === 'undefined',
       extendedInfo: {
         value: rule,
       },
-      details: {
-        type: 'list',
-        header: {
-          type: 'text',
-          text: 'View failing elements',
-        },
-        items: nodeDetails,
-      },
+      details: {...Audit.makeTableDetails(headings, items), impact, tags},
     };
   }
 }

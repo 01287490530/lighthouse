@@ -11,7 +11,7 @@ const strings = require('./strings');
  * @typedef LighthouseErrorDefinition
  * @property {string} code
  * @property {string} message
- * @property {RegExp|undefined} pattern
+ * @property {RegExp} [pattern]
  */
 
 class LighthouseError extends Error {
@@ -30,7 +30,7 @@ class LighthouseError extends Error {
   }
 
   /**
-   * @param {!LH.LighthouseError} err
+   * @param {Error} err
    */
   static isPageLoadError(err) {
     return err.code === ERRORS.NO_DOCUMENT_REQUEST.code ||
@@ -39,7 +39,7 @@ class LighthouseError extends Error {
 
   /**
    * @param {string} method
-   * @param {{message: string, data: string|undefined}} protocolError
+   * @param {{message: string, data?: string|undefined}} protocolError
    * @return {!Error|LighthouseError}
    */
   static fromProtocolMessage(method, protocolError) {
@@ -67,14 +67,16 @@ const ERRORS = {
   NO_SPEEDLINE_FRAMES: {message: strings.didntCollectScreenshots},
   SPEEDINDEX_OF_ZERO: {message: strings.didntCollectScreenshots},
   NO_SCREENSHOTS: {message: strings.didntCollectScreenshots},
+  INVALID_SPEEDLINE: {message: strings.didntCollectScreenshots},
 
   // Trace parsing errors
   NO_TRACING_STARTED: {message: strings.badTraceRecording},
   NO_NAVSTART: {message: strings.badTraceRecording},
+  NO_FCP: {message: strings.badTraceRecording},
   NO_FMP: {message: strings.badTraceRecording},
   NO_DCL: {message: strings.badTraceRecording},
 
-  // TTFI/TTCI calculation failures
+  // TTI calculation failures
   FMP_TOO_LATE_FOR_FCPUI: {message: strings.pageLoadTookTooLong},
   NO_FCPUI_IDLE_PERIOD: {message: strings.pageLoadTookTooLong},
   NO_TTI_CPU_IDLE_PERIOD: {message: strings.pageLoadTookTooLong},
@@ -88,9 +90,14 @@ const ERRORS = {
   TRACING_ALREADY_STARTED: {message: strings.internalChromeError, pattern: /Tracing.*started/},
   PARSING_PROBLEM: {message: strings.internalChromeError, pattern: /Parsing problem/},
   READ_FAILED: {message: strings.internalChromeError, pattern: /Read failed/},
+
+  // Protocol timeout failures
+  REQUEST_CONTENT_TIMEOUT: {message: strings.requestContentTimeout},
 };
 
 Object.keys(ERRORS).forEach(code => ERRORS[code].code = code);
+
+/** @type {Record<keyof typeof ERRORS, LighthouseErrorDefinition>} */
 LighthouseError.errors = ERRORS;
 module.exports = LighthouseError;
 

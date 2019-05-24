@@ -9,42 +9,44 @@ const Audit = require('../audit');
 
 class PasswordInputsCanBePastedIntoAudit extends Audit {
   /**
-   * @return {!AuditMeta}
+   * @return {LH.Audit.Meta}
    */
   static get meta() {
     return {
-      name: 'password-inputs-can-be-pasted-into',
-      description: 'Allows users to paste into password fields',
-      failureDescription: 'Prevents users to paste into password fields',
-      helpText: 'Preventing password pasting undermines good security policy. ' +
-          '[Learn more](https://www.ncsc.gov.uk/blog-post/let-them-paste-passwords)',
+      id: 'password-inputs-can-be-pasted-into',
+      title: 'Allows users to paste into password fields',
+      failureTitle: 'Prevents users to paste into password fields',
+      description: 'Preventing password pasting undermines good security policy. ' +
+          '[Learn more](https://developers.google.com/web/tools/lighthouse/audits/password-pasting).',
       requiredArtifacts: ['PasswordInputsWithPreventedPaste'],
     };
   }
 
   /**
-   * @param {!Artifacts} artifacts
-   * @return {!AuditResult}
+   * @param {LH.Artifacts} artifacts
+   * @return {LH.Audit.Product}
    */
   static audit(artifacts) {
     const passwordInputsWithPreventedPaste = artifacts.PasswordInputsWithPreventedPaste;
+
+    /** @type {Array<{node: LH.Audit.DetailsRendererNodeDetailsJSON}>} */
+    const items = [];
+    passwordInputsWithPreventedPaste.forEach(input => {
+      items.push({
+        node: {type: 'node', snippet: input.snippet},
+      });
+    });
+
+    const headings = [
+      {key: 'node', itemType: 'node', text: 'Failing Elements'},
+    ];
 
     return {
       rawValue: passwordInputsWithPreventedPaste.length === 0,
       extendedInfo: {
         value: passwordInputsWithPreventedPaste,
       },
-      details: {
-        type: 'list',
-        header: {
-          type: 'text',
-          text: 'Password inputs that prevent pasting into',
-        },
-        items: passwordInputsWithPreventedPaste.map(input => ({
-          type: 'text',
-          text: input.snippet,
-        })),
-      },
+      details: Audit.makeTableDetails(headings, items),
     };
   }
 }
